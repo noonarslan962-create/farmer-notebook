@@ -1,0 +1,417 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Trash, Plus, Globe } from "lucide-react";
+
+// TypeScript interfaces
+interface Entry {
+  id: string;
+  amount: number;
+  quantity: number;
+  type: "investment" | "profit";
+  costType?: "seed" | "fertilizer" | "labor" | "water" | "other";
+  timestamp: string;
+}
+
+// Translation dictionary
+const translations = {
+  en: {
+    title: "Farmer's Notebook",
+    addEntry: "Add Entry",
+    amount: "Amount (PKR)",
+    quantity: "Quantity",
+    hours: "Hours",
+    days: "Days",
+    delete: "Delete",
+    noEntries: "No entries yet. Add your first entry above!",
+    language: "Language",
+    urdu: "Urdu",
+    english: "English",
+    totalInvestments: "Total Investments",
+    totalProfits: "Total Profits",
+    netEarnings: "Net Earnings",
+    investment: "Investment",
+    profit: "Profit",
+    entries: "Entries",
+    costType: "Cost Type",
+    seed: "Seed",
+    fertilizer: "Fertilizer",
+    labor: "Labor",
+    water: "Water",
+    other: "Other",
+    selectType: "Select Type",
+    seedFertilizer: "Seed/Fertilizer",
+    laborCost: "Labor Cost",
+    waterCost: "Water Cost",
+    otherCost: "Other Cost"
+  },
+  ur: {
+    title: "کسان کی ڈائری",
+    addEntry: "داخلہ شامل کریں",
+    amount: "رقم (روپے)",
+    quantity: "مقدار",
+    hours: "گھنٹے",
+    days: "دن",
+    delete: "حذف کریں",
+    noEntries: "ابھی تک کوئی اندراج نہیں ہوا۔ اوپر سے پہلا اندراج شامل کریں!",
+    language: "زبان",
+    urdu: "اردو",
+    english: "انگریزی",
+    totalInvestments: "کل سرمایہ کاری",
+    totalProfits: "کل منافع",
+    netEarnings: "خالص آمدنی",
+    investment: "سرمایہ کاری",
+    profit: "munāfa",
+    entries: "اندراجات",
+    costType: "اخراجات کی قسم",
+    seed: "بیج",
+    fertilizer: "خ fertilizersاد",
+    labor: "مزدوری",
+    water: "پانی",
+    other: "دیگر",
+    selectType: "قسم منتخب کریں",
+    seedFertilizer: "بیج/خ fertilizersاد",
+    laborCost: "مزدوری کی لاگت",
+    waterCost: "پانی کی لاگت",
+    otherCost: "دیگر اخراجات"
+  },
+};
+
+export default function FarmersNotebook() {
+  const [language, setLanguage] = useState<"en" | "ur">("en");
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [amount, setAmount] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [type, setType] = useState<"investment" | "profit">("investment");
+  const [costType, setCostType] = useState<"seed" | "fertilizer" | "labor" | "water" | "other">("seed");
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedEntries = localStorage.getItem("farmEntries");
+    const savedLanguage = localStorage.getItem("farmLanguage");
+    
+    if (savedEntries) {
+      try {
+        setEntries(JSON.parse(savedEntries));
+      } catch (e) {
+        console.error("Error loading entries:", e);
+        setEntries([]);
+      }
+    }
+    
+    if (savedLanguage === "ur" || savedLanguage === "en") {
+      setLanguage(savedLanguage);
+    }
+  }, []);
+
+  // Save data to localStorage when entries change
+  useEffect(() => {
+    localStorage.setItem("farmEntries", JSON.stringify(entries));
+  }, [entries]);
+
+  // Save language preference
+  useEffect(() => {
+    localStorage.setItem("farmLanguage", language);
+  }, [language]);
+
+  const t = translations[language];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!amount || !quantity) return;
+    
+    const newEntry: Entry = {
+      id: Date.now().toString(),
+      amount: parseFloat(amount),
+      quantity: parseFloat(quantity),
+      type,
+      ...(type === "investment" && { costType }),
+      timestamp: new Date().toISOString()
+    };
+    
+    setEntries([newEntry, ...entries]);
+    
+    // Reset form
+    setAmount("");
+    setQuantity("");
+  };
+
+  const deleteEntry = (id: string) => {
+    setEntries(entries.filter(entry => entry.id !== id));
+  };
+
+  // Calculate totals by cost type
+  const calculateTotalByType = (costType: string) => {
+    return entries
+      .filter(entry => entry.type === "investment" && entry.costType === costType)
+      .reduce((sum, entry) => sum + (entry.amount * entry.quantity), 0);
+  };
+
+  // Calculate profits
+  const totalProfits = entries
+    .filter(entry => entry.type === "profit")
+    .reduce((sum, entry) => sum + (entry.amount * entry.quantity), 0);
+  
+  // Calculate investment totals
+  const seedFertilizerTotal = calculateTotalByType("seed") + calculateTotalByType("fertilizer");
+  const laborTotal = calculateTotalByType("labor");
+  const waterTotal = calculateTotalByType("water");
+  const otherTotal = calculateTotalByType("other");
+  
+  const totalInvestments = seedFertilizerTotal + laborTotal + waterTotal + otherTotal;
+  const netEarnings = totalProfits - totalInvestments;
+
+  // Get quantity label based on cost type
+  const getQuantityLabel = () => {
+    if (type !== "investment") return t.quantity;
+    
+    switch (costType) {
+      case "water": return t.hours;
+      case "labor": return t.days;
+      default: return t.quantity;
+    }
+  };
+
+  return (
+    <div 
+      className="min-h-screen bg-gradient-to-br from-green-50 to-amber-50 p-4"
+      dir={language === 'ur' ? 'rtl' : 'ltr'}
+    >
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <header className="flex flex-wrap justify-between items-center gap-3 mb-6 py-4">
+          <h1 className="text-2xl font-bold text-green-800">{t.title}</h1>
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Language Toggle */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setLanguage(language === 'en' ? 'ur' : 'en')}
+              className="border-green-300 text-green-700 hover:bg-green-100 flex items-center"
+            >
+              <Globe className="mr-1 h-4 w-4" />
+              {language === 'en' ? t.urdu : t.english}
+            </Button>
+          </div>
+        </header>
+
+        {/* Entry Form */}
+        <Card className="mb-6 border-green-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-green-800 text-lg">{t.addEntry}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <div className="md:col-span-3">
+                  <Label htmlFor="amount" className="text-green-700 text-sm">
+                    {t.amount}
+                  </Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
+                    required
+                    className="border-green-300 focus:ring-green-500 text-sm"
+                  />
+                </div>
+                
+                <div className="md:col-span-3">
+                  <Label htmlFor="quantity" className="text-green-700 text-sm">
+                    {getQuantityLabel()}
+                  </Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    min="0"
+                    step="0.1"
+                    required
+                    className="border-green-300 focus:ring-green-500 text-sm"
+                  />
+                </div>
+                
+                <div className="md:col-span-3">
+                  <Label htmlFor="type" className="text-green-700 text-sm">
+                    {t.investment}/{t.profit}
+                  </Label>
+                  <select
+                    id="type"
+                    value={type}
+                    onChange={(e) => setType(e.target.value as "investment" | "profit")}
+                    className="w-full rounded-md border border-green-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="investment">{t.investment}</option>
+                    <option value="profit">{t.profit}</option>
+                  </select>
+                </div>
+                
+                {type === "investment" && (
+                  <div className="md:col-span-2">
+                    <Label htmlFor="costType" className="text-green-700 text-sm">
+                      {t.costType}
+                    </Label>
+                    <select
+                      id="costType"
+                      value={costType}
+                      onChange={(e) => setCostType(e.target.value as any)}
+                      className="w-full rounded-md border border-green-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="seed">{t.seed}</option>
+                      <option value="fertilizer">{t.fertilizer}</option>
+                      <option value="labor">{t.labor}</option>
+                      <option value="water">{t.water}</option>
+                      <option value="other">{t.other}</option>
+                    </select>
+                  </div>
+                )}
+                
+                <div className={`md:col-span-${type === "investment" ? '1' : '3'} flex items-end`}>
+                  <Button 
+                    type="submit" 
+                    className="bg-green-600 hover:bg-green-700 text-white w-full h-9"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Summary Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <div className="p-4 rounded-lg border border-red-200 bg-red-50">
+            <p className="text-red-800 font-medium">{t.seedFertilizer}</p>
+            <p className="text-xl font-bold text-red-600 mt-1">{seedFertilizerTotal.toLocaleString()} PKR</p>
+          </div>
+          
+          <div className="p-4 rounded-lg border border-red-200 bg-red-50">
+            <p className="text-red-800 font-medium">{t.laborCost}</p>
+            <p className="text-xl font-bold text-red-600 mt-1">{laborTotal.toLocaleString()} PKR</p>
+          </div>
+          
+          <div className="p-4 rounded-lg border border-red-200 bg-red-50">
+            <p className="text-red-800 font-medium">{t.waterCost}</p>
+            <p className="text-xl font-bold text-red-600 mt-1">{waterTotal.toLocaleString()} PKR</p>
+          </div>
+          
+          <div className="p-4 rounded-lg border border-red-200 bg-red-50">
+            <p className="text-red-800 font-medium">{t.otherCost}</p>
+            <p className="text-xl font-bold text-red-600 mt-1">{otherTotal.toLocaleString()} PKR</p>
+          </div>
+          
+          <div className="p-4 rounded-lg border border-green-200 bg-green-50">
+            <p className="text-green-800 font-medium">{t.totalProfits}</p>
+            <p className="text-xl font-bold text-green-600 mt-1">{totalProfits.toLocaleString()} PKR</p>
+          </div>
+        </div>
+
+        {/* Net Earnings */}
+        <div className={`p-4 rounded-lg border mb-6 ${
+          netEarnings >= 0 
+            ? 'border-green-300 bg-green-100' 
+            : 'border-red-300 bg-red-100'
+        }`}>
+          <p className="font-medium text-gray-800 text-center">{t.netEarnings}</p>
+          <p className={`text-2xl font-bold mt-1 text-center ${
+            netEarnings >= 0 ? 'text-green-700' : 'text-red-700'
+          }`}>
+            {netEarnings.toLocaleString()} PKR
+          </p>
+        </div>
+
+        {/* Entries Table */}
+        <Card className="border-green-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-green-800 text-lg">
+              {t.investment} & {t.profit} {t.entries}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {entries.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">{t.noEntries}</p>
+                <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16 mx-auto" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-green-200">
+                      <th className="py-2 text-left text-green-700 text-sm">{t.type}</th>
+                      {language === 'en' ? (
+                        <th className="py-2 text-left text-green-700 text-sm">Cost Type</th>
+                      ) : (
+                        <th className="py-2 text-left text-green-700 text-sm">اخراجات کی قسم</th>
+                      )}
+                      <th className="py-2 text-left text-green-700 text-sm">{getQuantityLabel()}</th>
+                      <th className="py-2 text-right text-green-700 text-sm">Total (PKR)</th>
+                      <th className="py-2 text-center text-green-700 text-sm">{t.action}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry) => (
+                      <tr key={entry.id} className="border-b border-green-100 hover:bg-green-50">
+                        <td className="py-3 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            entry.type === 'investment' 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {entry.type === 'investment' ? t.investment : t.profit}
+                          </span>
+                        </td>
+                        <td className="py-3 text-sm">
+                          {entry.type === 'investment' && entry.costType 
+                            ? (language === 'en' ? t[entry.costType] : translations.ur[entry.costType])
+                            : '-'}
+                        </td>
+                        <td className="py-3 text-sm">
+                          {entry.quantity.toLocaleString()} 
+                          {entry.type === 'investment' && entry.costType === 'water' && ` ${t.hours}`}
+                          {entry.type === 'investment' && entry.costType === 'labor' && ` ${t.days}`}
+                        </td>
+                        <td className={`py-3 text-right font-medium text-sm ${
+                          entry.type === 'investment' 
+                            ? 'text-red-600' 
+                            : 'text-green-600'
+                        }`}>
+                          {(entry.amount * entry.quantity).toLocaleString()} PKR
+                        </td>
+                        <td className="py-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteEntry(entry.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <footer className="mt-6 text-center text-xs text-gray-500">
+          <p>© {new Date().getFullYear()} {t.title} - {language === 'en' ? 'All rights reserved' : 'جملہ حقوق محفوظ ہیں'}</p>
+        </footer>
+      </div>
+    </div>
+  );
+}
